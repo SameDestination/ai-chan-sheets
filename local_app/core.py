@@ -385,8 +385,10 @@ class Store:
         self.save(m)
         return m
 
-    def handoff(self, pid, tid, billing_evidence="", included_allowance_verified=False, authorize_requests=1):
+    def handoff(self, pid, tid, billing_evidence="", included_allowance_verified=False, authorize_requests=1, correction=""):
         m = self.get(pid)
+        require(isinstance(correction, str) and len(correction) <= 40000, "本次版本修正须为不超过40000字的文本")
+        correction = correction.strip()
         require(m["approved_revision"] == m["revision"], "当前计划未审批")
         require(not m["queue"]["paused"], "队列已暂停，请显式恢复")
         require(m["queue"]["active"] is None, "一次只交接一项；请先导入、取消或核对当前结果")
@@ -404,15 +406,24 @@ class Store:
         require(len(issued_versions) < m["attempt_limit_per_task"], "本任务交接次数上限已到；需人工核对")
         version = max(versions + [int(p.stem.rsplit("_v", 1)[1]) for p in events] + [0]) + 1
         refs = self.resolve_refs(m, tid)
-        prompt = self.prompt(m, tid)
+        base_prompt = self.prompt(m, tid)
+        prompt = copy.deepcopy(base_prompt)
+        if correction:
+            prompt["prompt"] += ("\n\n本次版本修正（不更改已批准的角色设计，仅修正本资产的执行结果）：\n" +
+                                 correction + "\n保留已批准角色身份、参考与共同约束；完成后仍需人工逐项审核。")
         t = self.task(m, tid)
         target = f"{t['group']}/{tid}_v{version:02}.png"
         event = {"task": tid, "version": version, "created_at": now(), "revision": m["revision"],
                  "fingerprint": self.signature(m, tid), "refs": refs, "prompt": prompt,
+                 "base_prompt": base_prompt, "correction": correction,
                  "destination": target, "billing_evidence": str(billing_evidence), "execution_mode": "codex_builtin",
                  "note": "交接不等于已生成，不会自动联网；预留一次请求额度以防重复。"}
         # Reserve usage/state before exposing instructions. A crash can over-reserve,
         # but can never conceal a possibly submitted request or reuse its version.
+        if correction:
+            m["selections"].pop(tid, None)
+            self.invalidate_dependents(m, tid)
+            m["export"] = None
         m["reserved_versions"] = m.get("reserved_versions", {})
         m["reserved_versions"].setdefault(tid, []).append(version)
         m["queue"]["active"] = tid
@@ -522,6 +533,7 @@ class Store:
                "model": "unreported", "returned_model": str(model)[:120] or "unreported", "quality": t["quality"], "size": t["size"],
                "returned_settings": {"dimensions": [info["width"], info["height"]], "quality": "unreported"},
                "settings_gap": t["size"] != f"{info['width']}x{info['height']}", "prompt": event["prompt"],
+               "base_prompt": event.get("base_prompt", event["prompt"]), "correction": event.get("correction", ""),
                "refs": event["refs"], "revision": m["revision"], "fingerprint": event["fingerprint"],
                "billing_evidence": str(billing_evidence), "billing_evidence_kind": "operator_attestation_not_independent_verification",
                "provider_request_id": None, "created_at": now(), "started_at": event["created_at"],

@@ -169,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
         if action == "enqueue":
             return store.enqueue(pid, d["tasks"])
         if action == "handoff":
-            return store.handoff(pid, d["task"], d.get("billing_evidence", ""), d.get("included_allowance_verified", False), d.get("authorize_requests", 1))
+            return store.handoff(pid, d["task"], d.get("billing_evidence", ""), d.get("included_allowance_verified", False), d.get("authorize_requests", 1), d.get("correction", ""))
         if action == "queue":
             return store.queue_control(pid, d["operation"])
         if action == "import":

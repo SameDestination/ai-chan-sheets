@@ -10,6 +10,14 @@
 
 Implementation and test evidence will be recorded in LOCAL_VALIDATION.md and the handoff.
 
+## Per-attempt correction fix — 2026-10-28
+
+- Owner: Codex controller-review agent; branch `fix/per-attempt-correction`, isolated worktree based on integration commit `4fa55a8`.
+- Scope: optional bounded correction on a single handoff, exact immutable attempt/base prompts, selective target/dependency invalidation, HTTP/UI input, documentation and offline regression tests.
+- Constraints: preserve approved character design and unrelated asset approvals; no installed-app/user-data writes, production changes or image-generation calls. Canonical plan edits retain full invalidation and all subscription/serial limits remain enforced.
+- Tests: controller regression suite including v01/v02 preservation, dependencies, unrelated selections, invalid inputs, approval/quota gates and HTTP correction forwarding; JavaScript syntax check.
+- Validation: `python -m unittest local_app.test_core -v` passed all 22 tests (27.665s); `node --check local_app/web/app.js` and `git diff --check` passed. No live generation calls or installed/user-data changes. Root agent integration review requested separately.
+
 Review complete: the read-only reviewer approved source publication after the serial-slot, prompt-history,
 crash-reservation, interrupted-import and self-contained compatibility-export fixes. No remaining high/medium
 findings or staged credential/private-asset findings. Separate UI and native-pixel branches were integrated

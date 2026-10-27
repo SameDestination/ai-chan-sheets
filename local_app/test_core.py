@@ -172,6 +172,86 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(before.read_bytes(), original)
         self.assertNotEqual(before.read_bytes(), (self.store.path(self.pid) / "00_提示词/A01.json").read_bytes())
 
+    def test_attempt_correction_preserves_design_and_unrelated_approved_assets(self):
+        tasks = copy.deepcopy(self.m["tasks"])
+        tasks[1]["refs"] = ["@A01"]
+        m = self.store.plan(self.pid, self.m["profile"], tasks)
+        self.store.approve_plan(self.pid)
+        for tid, index in (("A01", 1), ("A02", 2), ("A03", 3)):
+            self.import_fixture(tid, index)
+            self.store.review(self.pid, tid, 1, "approved", "offline fixture review")
+        m = self.store.get(self.pid)
+        revision = m["revision"]
+        signature = self.store.signature(m, "A01")
+        canonical_prompt = self.store.prompt(m, "A01")
+        project = self.store.path(self.pid)
+        immutable_paths = [project / "handoffs/A01_v01.json", project / "handoffs/A01_v01.md",
+                           project / "prompt_history/A01_v01.json", project / "00_生成记录/A01_v01.json"]
+        originals = {path: path.read_bytes() for path in immutable_paths}
+        m["export"] = {"fixture": True, "verified": True}
+        self.store.save(m)
+        self.store.enqueue(self.pid, ["A01"])
+        self.store.queue_control(self.pid, "resume")
+        correction = "Only repair this asset's outline; preserve the approved character design."
+        result = self.store.handoff(self.pid, "A01", "OFFLINE MOCK allowance evidence", True, correction=correction)
+        m = result["manifest"]
+        event = read_json(project / "handoffs/A01_v02.json")
+        self.assertEqual(event["base_prompt"], canonical_prompt)
+        self.assertEqual(event["correction"], correction)
+        self.assertEqual(event["fingerprint"], signature)
+        self.assertIn(correction, event["prompt"]["prompt"])
+        self.assertIn(correction, result["instruction"])
+        self.assertEqual(self.store.prompt(m, "A01"), canonical_prompt)
+        self.assertEqual(m["revision"], revision)
+        self.assertEqual(m["approved_revision"], revision)
+        self.assertNotIn("A01", m["selections"])
+        self.assertNotIn("A02", m["selections"])
+        self.assertEqual(m["task_status"]["A02"], "stale")
+        self.assertEqual(m["selections"]["A03"], 1)
+        self.assertEqual(m["task_status"]["A03"], "approved")
+        self.assertIsNone(m["export"])
+        for path, original in originals.items():
+            self.assertEqual(path.read_bytes(), original)
+        m = self.store.import_image(self.pid, "A01", fixture(4, (120, 200), True), "codex_builtin",
+                                    "OFFLINE MOCK only; no live generation", "mock-v02.png")
+        record = m["attempts"]["A01"][-1]
+        self.assertEqual(record["version"], 2)
+        self.assertEqual(record["prompt"], event["prompt"])
+        self.assertEqual(record["correction"], correction)
+        self.assertEqual(record["review_status"], "awaiting_review")
+        self.assertNotIn("A01", m["selections"])
+        m = self.store.review(self.pid, "A01", 2, "approved", "offline fixture review")
+        self.assertEqual(self.store.selected_record(m, "A01")["version"], 2)
+        self.assertEqual(self.store.selected_record(m, "A03")["version"], 1)
+
+    def test_attempt_correction_validation_and_existing_gates(self):
+        self.store.enqueue(self.pid, ["A01"])
+        self.store.queue_control(self.pid, "resume")
+        before = self.store.get(self.pid)
+        for value in (None, 1, [], "x" * 40001):
+            with self.assertRaisesRegex(ValueError, "版本修正"):
+                self.store.handoff(self.pid, "A01", "OFFLINE MOCK evidence", True, correction=value)
+        self.assertEqual(self.store.get(self.pid), before)
+        with self.assertRaisesRegex(ValueError, "额度"):
+            self.store.handoff(self.pid, "A01", correction="Repair the same approved design")
+        m = self.store.get(self.pid)
+        m["requests_dispatched"] = m["request_limit"]
+        self.store.save(m)
+        with self.assertRaisesRegex(ValueError, "上限"):
+            self.store.handoff(self.pid, "A01", "OFFLINE MOCK evidence", True, correction="Repair one detail")
+        m["requests_dispatched"] = 0
+        m["approved_revision"] = None
+        self.store.save(m)
+        with self.assertRaisesRegex(ValueError, "未审批"):
+            self.store.handoff(self.pid, "A01", "OFFLINE MOCK evidence", True, correction="Repair one detail")
+
+    def test_default_handoff_prompt_remains_canonical(self):
+        result = self.dispatch()
+        event = read_json(self.store.path(self.pid) / "handoffs/A01_v01.json")
+        self.assertEqual(event["correction"], "")
+        self.assertEqual(event["prompt"], self.store.prompt(result["manifest"], "A01"))
+        self.assertEqual(event["base_prompt"], event["prompt"])
+
     def test_interrupted_import_reconciles_without_overwriting(self):
         from unittest.mock import patch
         self.dispatch()
@@ -300,6 +380,21 @@ class HTTPTests(unittest.TestCase):
         health = self.request("/health")
         self.assertNotIn("stop_token", health)
         self.assertEqual(health["instance_id"], self.server.instance_id)
+
+    def test_handoff_correction_is_forwarded_and_recorded(self):
+        m = prepared_project(self.server.store)
+        status = self.request("/api/status")
+        headers = {"X-CSRF-Token": status["csrf_token"]}
+        self.request("/api/action", {"project": m["id"], "action": "enqueue", "tasks": ["A01"]}, headers)
+        self.request("/api/action", {"project": m["id"], "action": "queue", "operation": "resume"}, headers)
+        correction = "Correct this version only; retain approved proportions."
+        result = self.request("/api/action", {"project": m["id"], "action": "handoff", "task": "A01",
+                                               "billing_evidence": "OFFLINE HTTP MOCK evidence", "included_allowance_verified": True,
+                                               "authorize_requests": 1, "correction": correction}, headers)
+        self.assertIn(correction, result["instruction"])
+        event = read_json(self.server.store.path(m["id"]) / "handoffs/A01_v01.json")
+        self.assertEqual(event["correction"], correction)
+        self.assertIn(correction, event["prompt"]["prompt"])
 
 
 if __name__ == "__main__":

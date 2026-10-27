@@ -42,3 +42,9 @@ An explicitly labeled local example contains 22 deterministic geometric RGB/RGBA
 Actual live image requests: **0**. Actual subscription vision/planning requests: **0**. Paid Image/Responses API calls, API-key runners, purchased-credit consumption and provider substitutions: **0**. Image model observed from an execution: `unreported`.
 
 ChatGPT sign-in was confirmed by the official CLI's read-only login status. Tool presence/reference/edit schema was observed in the installing session; neither proves funding, returned output or reference conditioning. See [CAPABILITY_AUDIT.md](CAPABILITY_AUDIT.md). The unresolved live prerequisites are explicit and do not prevent using project management, review, composition or exports after this Codex session.
+
+## Software follow-up checks — 2026-10-28
+
+Per-attempt correction support now preserves the approved canonical design and unrelated selections while retaining the exact immutable corrected prompt. Target and dependent selections require review again. The combined offline suite passed **66/66** tests in 38.148 seconds, including HTTP forwarding and unchanged billing/approval gates. This supersedes the earlier 62-test software count without rewriting the historical installation audit.
+
+Diagnostics can display an explicit, timestamped project `execution_summary` separately from that installation audit. JavaScript syntax and render smoke checks passed: an ordinary imported file does not imply billing, reference conditioning, automation or artwork approval, while explicit project evidence displays its own timestamp, provenance and call counts. Session artwork and account usage evidence remain local project data and are not committed with application code.

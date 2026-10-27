@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>角色设定工坊 · Character Sheets</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#overview"><span class="brand-mark">CS</span><span>角色设定工坊<small>CHARACTER SHEETS · LOCAL</small></span></a>
+    <label class="project-label" for="project-select">当前项目</label>
+    <select id="project-select" aria-label="当前项目"><option value="">选择项目</option></select>
+    <button id="new-project" class="button secondary full">＋ 新建角色项目</button>
+    <nav aria-label="制作步骤">
+      <a href="#overview" data-page="overview"><span>01</span>项目概览</a>
+      <a href="#references" data-page="references"><span>02</span>参考与角色分析</a>
+      <a href="#manifest" data-page="manifest"><span>03</span>制作清单</a>
+      <a href="#queue" data-page="queue"><span>04</span>提示词与生成交接</a>
+      <a href="#review" data-page="review"><span>05</span>逐图审阅</a>
+      <a href="#exports" data-page="exports"><span>06</span>原像素合成与验证</a>
+      <a href="#diagnostics" data-page="diagnostics"><span>◎</span>能力与订阅诊断</a>
+    </nav>
+    <div class="sidebar-footer"><span class="local-dot"></span>仅在此电脑运行<small>127.0.0.1 · 数据保存在本地</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><div><span class="eyebrow">独立素材 · 逐图审阅 · 原像素交付</span><h1 id="page-title">项目概览</h1></div><span class="badge amber">订阅专用 · 无 API 计费</span></header>
+    <div id="connection" role="status" class="connection">正在连接本地工作台…</div>
+    <section id="content" aria-live="polite"></section>
+    <footer class="main-footer">本地制作控制器 · 生成需要在已登录的 Codex / ChatGPT 中逐项完成 · 像素验证不代替艺术审阅</footer>
+  </main>
+  <div id="toast" role="status" hidden></div>
+  <dialog id="dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="dialog-close" class="icon-button" aria-label="关闭">×</button></div><div id="dialog-body"></div></dialog>
+</body>
+</html>

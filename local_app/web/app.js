@@ -54,7 +54,60 @@ function renderReview(){if(!requireProject())return;const out=$('content');const
 function verified(){const p=state.project;return p?.verification?.status==='VERIFIED'||p?.verification?.verified===true||p?.export_status==='VERIFIED';}
 function collectPaths(value,result=new Set(),depth=0){if(depth>7||value===null)return result;if(typeof value==='string'&&/\.(png|jpg|jpeg|json|txt|md|zip)$/i.test(value)&&!value.includes('://')&&!value.startsWith('/')&&!/^[A-Za-z]:/.test(value))result.add(value);else if(Array.isArray(value))value.forEach(v=>collectPaths(v,result,depth+1));else if(typeof value==='object')Object.values(value).forEach(v=>collectPaths(v,result,depth+1));return result;}
 function renderExports(){if(!requireProject())return;const out=$('content');out.append(notice('最终成品仅使用当前、已人工批准并明确选定的素材。主图不缩放、不裁剪素材；透明像素先合成到白底。独立验证失败会阻止 VERIFIED 状态。','blue'));const c=card('原像素合成与导出','四个分区各占一行，素材从左向右排列。默认 22 项画板的宽高比须为 1.3–2.4。标题与留白会明确记录。');const opts=textarea('{\n  "margin": 110,\n  "gap_x": 56,\n  "gap_y": 56\n}','editor');opts.style.minHeight='120px';add(c,field('明确的版式选项',opts,'保持素材 scale = 1.0。若资源不足，程序应返回错误，禁止悄悄缩小原图。'),actions(button('合成并独立验证 / 导出',async()=>{const r=await action('compose',{options:parseJSON(opts.value,'版式选项')});resultDialog('合成与验证结果',r);},''),button('从磁盘重新独立验证',async()=>{const r=await action('verify');resultDialog('独立验证报告',r);},'secondary')),el('p','small muted spaced','导出：原像素 PNG 主图、约 4200px 浏览预览、≤4000px 总览、四个分区预览、四张原像素切片、版式索引与验证报告。'));out.append(c);const result=card('交付状态');add(result,badge(verified()?'VERIFIED · 独立像素验证通过':'尚无已验证最终交付',verified()?'green':'amber'));const data=state.project.exports||state.project.export||state.project.verification||state.project.last_export;const paths=collectPaths(data);if(paths.size){const ul=el('ul','download-list');for(const path of paths){const li=el('li');const a=link(path,fileURL(path));a.download='';add(li,a,badge(path.includes('preview')||path.includes('预览')?'浏览预览':'本地文件'));ul.append(li);}result.append(ul);const preview=[...paths].find(p=>/preview|预览|overview/.test(p)&&/\.(png|jpg|jpeg)$/.test(p));if(preview){const im=image(preview,'画板浏览预览');im.style.width='100%';im.style.marginTop='20px';result.append(im);}}if(data)add(result,el('pre','code spaced',pretty(data)));else add(result,el('p','muted small spaced','完成清单批准、素材导入与人工版本选择后，即可制作最终画板。'));out.append(result);}
-function renderDiagnostics(){const out=$('content');const c=card('ChatGPT Pro / Codex 内置生图','诊断分别描述连接、工具暴露、计费证据、真实生成、参考条件和艺术批准，不将其中一项推断为其他项。');const cap=state.status?.capability||{};add(c,notice('SUBSCRIPTION_IMAGE_GENERATION_NOT_AUTOMATABLE · 当前使用会话内逐项交接。单机应用没有经过验证的自主订阅生图接口。额度或计费无法确认时保持阻塞。'),badge('Subscription-only; no API billing; no purchased credits','amber'));const kv=el('dl','kv');const rows=[['Codex 通过 ChatGPT 登录',display(cap.codex_signed_in_with_chatgpt??cap.chatgpt_signed_in)],['API-key 模式',display(cap.api_key_mode)],['会话内 image_gen 工具',display(cap.builtin_image_gen_exposed??cap.builtin_exposed)],['图像模型（实际观察）',cap.observed_image_model||cap.observed_model||'unreported'],['订阅计费证据',cap.subscription_billing_evidence||cap.billing_evidence||'尚未独立确认本次图像请求的计费方式'],['订阅内可用额度',cap.allowance_evidence||'当前运行环境未返回权威额度；在官方客户端 /status 或用量页面核实'],['真实输出文件已返回',display(cap.image_file_returned)],['参考条件已验证',display(cap.reference_conditioning_verified)],['独立程序生图已验证',display(cap.programmatic_invocation_supported??cap.standalone_automation_verified)],['待处理请求',(state.project?.tasks||[]).filter(t=>['queued','running','pending'].includes(taskState(t))).length+' 项 · 同时最多 1 项'],['本次安装真实生图 / 视觉调用',(cap.live_image_calls??0)+' / '+(cap.live_vision_calls??0)],['阻塞原因',cap.live_blocker||cap.blocker||'尚未核实订阅内额度与独立程序生图路径']];for(const [k,v]of rows)add(kv,el('dt','',k),el('dd','',v));add(c,kv,actions(button('刷新本地诊断',async()=>{await refreshStatus();render();toast('本地诊断已刷新；没有调用生图');},'secondary'),link('查看官方用量页面','https://chatgpt.com/codex/settings/usage','button secondary')));out.append(c);const instructions=card('安全的单项操作方式');const list=el('ol','small muted');for(const s of ['在官方 Codex / ChatGPT 客户端核实 ChatGPT 登录、订阅内额度与重置时间，确认不会消耗另购积分。','批准清单，在“提示词与生成交接”中填写真实额度证据，导出一个素材的交接说明。','将说明及真实参考图片交给同一已登录的 Codex 会话。仅调用内置 image_gen；手工 ChatGPT Images 需明确记录导入方式。','从工具实际报告的位置复制选定的生成文件，保留原件与原始提示词，在“逐图审阅”导入新版本。','检查真实尺寸和角色一致性，逐项人工批准并选择版本，再进行合成和独立像素验证。','遇到额度耗尽、认证问题或提交后超时，暂停并核对结果；禁止 API-key 回退、切换账号、购买积分或自动重复调用。'])list.append(el('li','',s));instructions.append(list);out.append(instructions);}
+function renderDiagnostics(){
+  const out=$('content');
+  const installcap=state.status?.capability||{};
+  const summary=state.project?.execution_summary;
+  const projectcap=summary&&typeof summary==='object'&&!Array.isArray(summary)?summary:null;
+  // A project summary is explicit historical operator evidence, never inferred from imported files.
+  const cap={...installcap,...projectcap};
+  const scope=projectcap?'当前项目':'安装审计';
+  const c=card(scope+' · ChatGPT Pro / Codex 内置生图','分别描述连接、工具暴露、计费证据、真实生成、参考条件和艺术批准，不将其中一项推断为其他项。');
+  add(c,notice('SUBSCRIPTION_IMAGE_GENERATION_NOT_AUTOMATABLE · 当前使用会话内逐项交接。单机应用没有经过验证的自主订阅生图接口。额度或计费无法确认时保持阻塞。'),badge('Subscription-only; no API billing; no purchased credits','amber'));
+  if(projectcap)add(c,notice('以下为操作者记录的当前项目历史会话证据，不是实时计费查询。普通文件导入不证明订阅资金或参考条件；记录成功生图也不代表独立后台自动化或人工艺术批准。','blue'));
+  const kv=el('dl','kv');
+  const rows=[];
+  if(projectcap)rows.push(
+    ['项目证据记录时间',projectcap.audit_at||'未提供；请核对记录时间'],
+    ['项目证据来源',projectcap.evidence_origin||'操作者记录；具体依据见下方计费、额度与执行证据']
+  );
+  rows.push(
+    ['Codex 通过 ChatGPT 登录',display(cap.codex_signed_in_with_chatgpt??cap.chatgpt_signed_in)],
+    ['API-key 模式',display(cap.api_key_mode)],
+    ['会话内 image_gen 工具',display(cap.builtin_image_gen_exposed??cap.builtin_exposed)],
+    ['图像模型（实际观察）',cap.observed_image_model||cap.observed_model||'unreported'],
+    ['订阅计费证据',cap.subscription_billing_evidence||cap.billing_evidence||'尚未独立确认本次图像请求的计费方式'],
+    [projectcap?'包含额度（记录时）':'订阅内可用额度',cap.allowance_evidence||'当前运行环境未返回权威额度；在官方客户端 /status 或用量页面核实'],
+    ['真实输出文件已返回',display(cap.image_file_returned)],
+    ['参考条件已验证',display(cap.reference_conditioning_verified)],
+    ['独立程序生图已验证',display(cap.programmatic_invocation_supported??cap.standalone_automation_verified)],
+    ['待处理请求',(state.project?.tasks||[]).filter(t=>['queued','running','pending'].includes(taskState(t))).length+' 项 · 同时最多 1 项'],
+    [projectcap?'当前项目真实生图 / 视觉调用':'本次安装真实生图 / 视觉调用',(cap.live_image_calls??0)+' / '+(cap.live_vision_calls??0)],
+    [projectcap?'当前项目后续限制':'阻塞原因',cap.live_blocker||cap.blocker||'独立后台生图路径未验证；每项请求仍须核对当前包含额度与计费方式']
+  );
+  for(const [k,v]of rows)add(kv,el('dt','',k),el('dd','',v));
+  add(c,kv,actions(button('刷新本地记录',async()=>{
+    await refreshStatus();
+    if(state.project)state.project=await api('/api/project?'+new URLSearchParams({id:state.project.id}));
+    render();toast('本地记录已刷新；没有查询实时额度或调用生图');
+  },'secondary'),link('查看官方用量页面','https://chatgpt.com/codex/settings/usage','button secondary')));
+  out.append(c);
+  if(projectcap){
+    const historical=card('安装时的能力审计','安装审计保留为历史基线；后续项目执行证据不会回写或改称安装时已验证。');
+    const initial=el('dl','kv');
+    for(const [k,v]of [
+      ['安装时真实输出文件已返回',display(installcap.image_file_returned)],
+      ['安装时参考条件已验证',display(installcap.reference_conditioning_verified)],
+      ['安装时真实生图 / 视觉调用',(installcap.live_image_calls??0)+' / '+(installcap.live_vision_calls??0)],
+      ['安装审计依据',installcap.evidence||installcap.subscription_billing_evidence||'详见 CAPABILITY_AUDIT.md']
+    ])add(initial,el('dt','',k),el('dd','',v));
+    historical.append(initial);out.append(historical);
+  }
+  const instructions=card('安全的单项操作方式');
+  const list=el('ol','small muted');
+  for(const s of ['在官方 Codex / ChatGPT 客户端核实 ChatGPT 登录、订阅内额度与重置时间，确认不会消耗另购积分。','批准清单，在“提示词与生成交接”中填写真实额度证据，导出一个素材的交接说明。','将说明及真实参考图片交给同一已登录的 Codex 会话。仅调用内置 image_gen；手工 ChatGPT Images 需明确记录导入方式。','从工具实际报告的位置复制选定的生成文件，保留原件与原始提示词，在“逐图审阅”导入新版本。','检查真实尺寸和角色一致性，逐项人工批准并选择版本，再进行合成和独立像素验证。','遇到额度耗尽、认证问题或提交后超时，暂停并核对结果；禁止 API-key 回退、切换账号、购买积分或自动重复调用。'])list.append(el('li','',s));
+  instructions.append(list);out.append(instructions);
+}
 function display(v){if(v===true||v==='yes')return '是';if(v===false||v==='no')return '否';if(v===undefined||v===null||v==='unknown'||v==='not_verified')return '未知 / 尚未验证';return String(v);}
 $('dialog-close').addEventListener('click',()=>$('dialog').close());$('new-project').addEventListener('click',()=>guard(newProject));$('project-select').addEventListener('change',()=>guard(()=>loadProject($('project-select').value)));window.addEventListener('hashchange',render);$('dialog').addEventListener('click',e=>{if(e.target===$('dialog')){const r=$('dialog').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('dialog').close();}});
 guard(async()=>{await refreshStatus();const remembered=new URLSearchParams(location.search).get('project')||localStorage.getItem('character-sheets:last-project');const existing=(state.status.projects||[]).find(p=>p.id===remembered);if(existing)await loadProject(existing.id);else render();});

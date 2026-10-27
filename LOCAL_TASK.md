@@ -9,3 +9,8 @@
 - Unresolved: no authoritative remaining included allowance available; live calls blocked. Built-in tool is exposed in this interactive session. Elevated read-only `codex login status` reports ChatGPT login; no credentials read.
 
 Implementation and test evidence will be recorded in LOCAL_VALIDATION.md and the handoff.
+
+Review complete: the read-only reviewer approved source publication after the serial-slot, prompt-history,
+crash-reservation, interrupted-import and self-contained compatibility-export fixes. No remaining high/medium
+findings or staged credential/private-asset findings. Separate UI and native-pixel branches were integrated
+without sharing implementation writers. Real image/vision calls remain zero; live capability remains blocked.

@@ -3,7 +3,7 @@ param([string]$Destination = (Join-Path $env:USERPROFILE 'ai-chan-sheets-local')
 $ErrorActionPreference = 'Stop'
 $SourceRoot = $PSScriptRoot
 $ResolvedDestination = [IO.Path]::GetFullPath($Destination)
-if (-not $DataRoot) { $DataRoot = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'CharacterSheets' }
+if (-not $DataRoot) { $DataRoot = Join-Path $env:USERPROFILE 'Documents\CharacterSheets' }
 $ResolvedDataRoot = [IO.Path]::GetFullPath($DataRoot)
 if (-not (Test-Path -LiteralPath (Join-Path $SourceRoot 'requirements.txt'))) { throw 'Pinned requirements.txt is missing.' }
 if (-not $Python) {
@@ -41,7 +41,7 @@ if ([IO.Path]::GetFullPath($SourceRoot).TrimEnd('\') -ne $ResolvedDestination.Tr
     # Copy only application sources and notices. Existing files are backed up; user data is never copied.
     $BackupRoot = Join-Path $ResolvedDestination ('.install-backups\' + (Get-Date -Format 'yyyyMMdd-HHmmss-ffff'))
     $Selected = @('local_app', 'requirements.txt', 'LICENSE', 'README.md', 'LOCAL_README.zh-CN.md',
-                  'NOTICE.local.md', 'LOCAL_VALIDATION.md', 'LOCAL_HANDOFF.md',
+                  'NOTICE.local.md', 'AI_CONTEXT.md', 'LOCAL_VALIDATION.md', 'LOCAL_HANDOFF.md',
                   'UPSTREAM_COMPATIBILITY.md', 'CAPABILITY_AUDIT.md', '.env.example',
                   'Start-CharacterSheets.cmd', 'Start-CharacterSheets.ps1',
                   'Stop-CharacterSheets.cmd', 'Stop-CharacterSheets.ps1',

@@ -14,6 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+import uuid
 
 APP = "character-sheets-local"
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -21,11 +22,8 @@ RUNTIME = APP_ROOT / ".runtime" / "server.json"
 
 
 def documents_directory() -> Path:
-    if os.name == "nt":
-        buffer = ctypes.create_unicode_buffer(32768)
-        # CSIDL_PERSONAL honors a relocated Documents folder.
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buffer) == 0:
-            return Path(buffer.value)
+    # Honor the explicit USERPROFILE/Documents default, without silently
+    # moving private project assets into a cloud-redirected Known Folder.
     return Path.home() / "Documents"
 
 
@@ -162,8 +160,9 @@ def start(runtime: Path, data_root: Path, open_browser: bool) -> dict:
                 raise RuntimeError("Recorded process is still alive but its health check failed. Do not start a duplicate; inspect diagnostics.")
             data_root.mkdir(parents=True, exist_ok=True)
             logfile = runtime.parent / "server.log"
+            expected_instance = uuid.uuid4().hex
             command = [sys.executable, "-m", "local_app.server", "--data-root", str(data_root.resolve()),
-                       "--port", "0", "--runtime-file", str(runtime.resolve())]
+                       "--port", "0", "--runtime-file", str(runtime.resolve()), "--instance-id", expected_instance]
             creationflags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
             with logfile.open("ab") as log:
                 process = subprocess.Popen(command, cwd=str(APP_ROOT), stdin=subprocess.DEVNULL,
@@ -172,12 +171,14 @@ def start(runtime: Path, data_root: Path, open_browser: bool) -> dict:
             deadline = time.monotonic() + 15
             result = None
             while time.monotonic() < deadline:
+                current = read_runtime(runtime)
+                # Windows venv redirectors may have a different PID from the
+                # actual Python server. A per-launch nonce authenticates it.
+                if current and current.get("instance_id") == expected_instance and matching_health(current):
+                    result = {"status": "started", "url": local_url(current), "pid": current["pid"]}
+                    break
                 if process.poll() is not None:
                     raise RuntimeError("Server exited during startup. Inspect: " + str(logfile))
-                current = read_runtime(runtime)
-                if current and int(current.get("pid", 0)) == process.pid and matching_health(current):
-                    result = {"status": "started", "url": local_url(current), "pid": process.pid}
-                    break
                 time.sleep(0.15)
             if result is None:
                 raise RuntimeError("Startup outcome unknown; do not launch again until diagnostics reconcile it. Log: " + str(logfile))

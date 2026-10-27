@@ -16,3 +16,21 @@ desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# Standalone controller: local environments, credentials and all managed user data.
+.venv/
+.runtime/
+runtime/
+local-data/
+CharacterSheets/
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+generated_images/
+original_outputs/
+exports/
+test-output/
+**/p-*/
+.install-backups/

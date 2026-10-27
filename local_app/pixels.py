@@ -46,6 +46,12 @@ def _canonical(value):
                       separators=(',', ':')).encode('utf-8')
 
 
+def _manifest_hash(manifest):
+    # The export pointer is written only after verification. It cannot participate
+    # in its own content hash; all source/approval/selection fields still do.
+    return hashlib.sha256(_canonical({k: v for k, v in manifest.items() if k != 'export'})).hexdigest()
+
+
 def _path(project, relative):
     _need(isinstance(relative, str) and relative and '\\' not in relative
           and ':' not in relative, '文件路径必须是工程内的相对路径')
@@ -400,7 +406,7 @@ def _compose(project: Path, manifest: dict, selected: list[dict], options: dict 
                 finally:
                     crop.close()
         index = dict(schema_version=1, revision=manifest.get('revision'),
-                     manifest_sha256=hashlib.sha256(_canonical(manifest)).hexdigest(),
+                     manifest_sha256=_manifest_hash(manifest),
                      export_version=number, master=f'{relative}/master.png',
                      master_sha256=_hash(staging/'master.png'), assets=assets,
                      config=config, font=font_path.name, estimates=estimates,
@@ -409,7 +415,7 @@ def _compose(project: Path, manifest: dict, selected: list[dict], options: dict 
         result = dict(directory=relative, index=f'{relative}/layout.json',
                       index_sha256=_hash(staging/'layout.json'), master=index['master'],
                       master_sha256=index['master_sha256'], report=f'{relative}/report.json',
-                      dimensions=[w,h], estimates=estimates, verified=False)
+                      dimensions=[w,h], estimates=estimates, files=files, verified=False)
         os.replace(staging, final)
         report = verify(project, manifest, assets, result)
         _atomic_json(final/'report.json', report)
@@ -445,7 +451,7 @@ def _verify(project: Path, manifest: dict, selected: list[dict], export: dict) -
     index_path = _path(project, export.get('index'))
     _need(index_path.is_file() and _hash(index_path) == export.get('index_sha256'), '布局索引哈希不符或缺失')
     idx = _read(index_path)
-    _need(idx.get('manifest_sha256') == hashlib.sha256(_canonical(manifest)).hexdigest()
+    _need(idx.get('manifest_sha256') == _manifest_hash(manifest)
           and idx.get('revision') == manifest.get('revision'), '导出对应的清单已过期')
     _need(idx.get('assets') == assets and idx.get('original_scale') == 1.0,
           '索引素材列表与当前选择不一致或已缩放')
